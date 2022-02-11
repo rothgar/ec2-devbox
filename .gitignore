@@ -1,3 +1,4 @@
 .terraform*
 INSTANCE_ID.txt
 *.tfstate*
+*.pem

@@ -10,16 +10,14 @@ provider aws {
   region = "${var.AWS_REGION}"
 }
 
-variable "key_name" {}
-
-resource "tls_private_key" "devbox" {
+resource "tls_private_key" "ssh_key" {
   algorithm = "RSA"
   rsa_bits  = 4096
 }
 
 resource "aws_key_pair" "generated_key" {
-  key_name   = var.key_name
-  public_key = tls_private_key.devbox.public_key_openssh
+  key_name   = "${var.EC2_INSTANCE_NAME}"
+  public_key = tls_private_key.ssh_key.public_key_openssh
 }
 
 data "aws_ami" "ubuntu" {
@@ -41,8 +39,9 @@ resource "aws_instance" "dev_instance" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = "${var.EC2_INSTANCE_SIZE}"
   associate_public_ip_address = false
+  # need to create an instance profile
   iam_instance_profile = "${var.EC2_INSTANCE_NAME}"
-  key_key_name = devbox
+  key_name = "${var.EC2_INSTANCE_NAME}"
 
   root_block_device {
     volume_size           = "${var.EC2_ROOT_VOLUME_SIZE}"
@@ -67,7 +66,7 @@ useradd -s /bin/zsh -m ssm-user
 echo "ssm-user ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/ssm-user
 
 # Add our SSH keys from GitHub
-sudo -u ssm-user -- ssh-import-id gh:rothgar
+# sudo -u ssm-user -- ssh-import-id gh:rothgar
 
 # set CI for automated brew install
 # export CI=1 HOME=/home/ssm-user
@@ -86,14 +85,19 @@ EOC
 EOF
 
   provisioner "local-exec" {
-    command = "echo ${self.id} >> INSTANCE_ID.txt"
+    command = "echo ${self.id} > INSTANCE_ID.txt"
   }
 }
 
-resource "local_file" "foo" {
-    content     = tls_private_key.devbox.private_key_pem
+resource "local_file" "ssh_key_file" {
+    content     = tls_private_key.ssh_key.private_key_pem
     file_permission = "0600"
-    filename = "~/.ssh/devbox.pem"
+    filename = "${var.EC2_INSTANCE_NAME}.pem"
+}
+
+resource "local_file" "instance_file" {
+    content  = aws_instance.dev_instance.id
+    filename = "INSTANCE_ID.txt"
 }
 
 output "instance-id" {
