@@ -66,7 +66,7 @@ useradd -s /bin/zsh -m ssm-user
 echo "ssm-user ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/ssm-user
 
 # Add our SSH keys from GitHub
-# sudo -u ssm-user -- ssh-import-id gh:rothgar
+sudo -u ssm-user -- ssh-import-id gh:rothgar
 
 # set CI for automated brew install
 # export CI=1 HOME=/home/ssm-user
@@ -83,10 +83,6 @@ Pin-Priority: -1
 EOC
 
 EOF
-
-  provisioner "local-exec" {
-    command = "echo ${self.id} > INSTANCE_ID.txt"
-  }
 }
 
 resource "local_file" "ssh_key_file" {
@@ -94,6 +90,19 @@ resource "local_file" "ssh_key_file" {
     file_permission = "0600"
     filename = "${var.EC2_INSTANCE_NAME}.pem"
 }
+
+# resource "local_file" "ssh_config" {
+#   filename = "${var.EC2_INSTANCE_NAME}.config"
+#   content = <<- EOT
+#   Host "${var.EC2_INSTANCE_NAME}"
+#     HostName "${aws_instance.dev_instance.id}"
+#     StrictHostKeyChecking no
+#     IdentityFile "${local_file.ssh_key_file.filename}"
+#     UserKnownHostsFile=/dev/null
+#     User ubuntu
+#     ProxyCommand bash --login -c "/home/linuxbrew/.linuxbrew/bin/aws ssm start-session --target $(echo %h|cut -d'.' -f1) --profile work --region us-west-2 --document-name AWS-StartSSHSession --parameters 'portNumber=%p'"
+# EOT
+# }
 
 resource "local_file" "instance_file" {
     content  = aws_instance.dev_instance.id
